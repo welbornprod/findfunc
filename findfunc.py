@@ -4,7 +4,12 @@
 """ findfunc.py
     Finds function definitions in local source files.
     This is a rewrite of findfunc.sh to better handle pygments integration.
-    It currently handles Python, Javascript, Bash, and C-like languages.
+    It currently handles Python, Javascript, Bash, Make, and C-like languages.
+
+    The search is regex-based, and depends on function defs starting on a new
+    line. No AST-parser or anything like that. It works for me to find
+    "snippets" or commonly-used functions.
+
     -Christopher Welborn 11-15-2016
 """
 
@@ -43,6 +48,9 @@ SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
 
 USAGESTR = """{versionstr}
+
+    Finds function definitions and Makefile targets in files.
+
     Usage:
         {script} -h | -v
         {script} [-D] [-a] PAT [PATH...] [-S] [-s]
@@ -61,7 +69,7 @@ USAGESTR = """{versionstr}
         -e pat,--exclude pat   : Regex pattern to exclude file paths.
         -f pat,--filter pat    : Regex pattern to include file paths.
         -h,--help              : Show this help message.
-        -l num,--length num    : Show definitions that match this length.
+        -l num,--length num    : Show definitions that match this line length.
                                  Tests can be prepended:
                                      >N  : More than N lines.
                                      <N  : Less than N lines.
@@ -74,6 +82,10 @@ USAGESTR = """{versionstr}
         -S,--signature         : Just print the signatures found.
         -s,--short             : Use shorter output mode.
         -v,--version           : Show version.
+
+    Any file with a name like '[Mm]akefile' will trigger makefile-mode.
+    Unfortunately that mode doesn't work for stdin data.
+
 """.format(script=SCRIPT, versionstr=VERSIONSTR)
 
 DEBUG = False
