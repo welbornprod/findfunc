@@ -42,7 +42,7 @@ debugprinter.disable()
 debug = debugprinter.debug
 
 NAME = 'FindFunc'
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -54,7 +54,7 @@ USAGESTR = """{versionstr}
     Usage:
         {script} -h | -v
         {script} [-D] [-a] PAT [PATH...] [-S] [-s]
-                 [-c pat] [-e pat] [-f pat] [-l num]
+                 [-c pat] [-C pat] [-e pat] [-f pat] [-l num]
 
     Options:
         PATH                   : Zero or more file paths to search.
@@ -65,6 +65,9 @@ USAGESTR = """{versionstr}
                                  This is the same as: (.+?pattern|pattern.+?)
         -c pat,--contains pat  : Only show definitions that contain this
                                  pattern in the body.
+        -C pat,--without pat   : Only show definitions that do not contain
+                                 this pattern in the body.
+                                 This cancels out any -c pattern.
         -D,--debug             : Print some debugging info while running.
         -e pat,--exclude pat   : Regex pattern to exclude file paths.
         -f pat,--filter pat    : Regex pattern to include file paths.
@@ -113,6 +116,7 @@ def main(argd):
     # Using the default 'all' pattern for possible future function listing.
     userpat = try_repat(argd['PAT'], default=re.compile('.+'))
     containspat = try_repat(argd['--contains'], default=None)
+    withoutpat = try_repat(argd['--without'], default=None)
     includepat = try_repat(argd['--filter'], default=None)
     excludepat = try_repat(argd['--exclude'], default=None)
     lengthfunc = parse_length_arg(argd['--length'], default=None)
@@ -137,6 +141,11 @@ def main(argd):
                         (containspat is not None) and
                         (not funcdef.contains(containspat))):
                     debug('Skipping non-match: {}'.format(funcdef.signature))
+                    continue
+                if (
+                        (withoutpat is not None) and
+                        funcdef.contains(withoutpat)):
+                    debug('Skipping match: {}'.format(funcdef.signature))
                     continue
                 # Test length?
                 if (
@@ -256,7 +265,10 @@ def find_func_in_file(f, pattern):
                 else:
                     funcdef = None
                     continue
-            elif line and (not line.startswith((' ', '\t'))):
+            elif (
+                    line and
+                    (not line.startswith((' ', '\t')))
+                    ):
                 # End if func def? There's a new line with no indention.
                 if funcdef.signature.endswith('{'):
                     # Must find a closing brace to be the end.
@@ -305,6 +317,7 @@ def get_func_pattern(pattern, ignore_case=True):
         r'(function {userpattern} ?\()',
         # Python patterns.
         r'(def {userpattern} ?\()',
+        r'(([ \t]+)def {userpattern} ?\()',
         r'({userpattern} ?= ? lambda)',
         # Shell patterns.
         r'(function {userpattern} ?\{{)',
@@ -429,7 +442,7 @@ class FunctionDef(object):
         self.lineno = lineno or 0
         # These are set on the first add_line(), which should be the def.
         self.signature = None
-        self.indent = None
+        self.indent = ''
         self.indent_len = 0
 
         if first_line:
