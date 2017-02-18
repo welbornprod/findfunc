@@ -250,7 +250,10 @@ def find_func_in_file(f, pattern):
                 # Not a start, not in the body.
                 continue
         elif funcdef:
-            if startpat.search(line) is not None:
+            child_indent = (
+                len(FunctionDef.get_indent(line)) > len(funcdef.indent)
+            )
+            if (startpat.search(line) is not None) and (not child_indent):
                 # Start of another function def.
                 debug('Found start of another def: {!r}'.format(line))
                 yield funcdef
@@ -532,7 +535,8 @@ class FunctionDef(object):
             return 'stdin'
         return self.filename
 
-    def get_indent(self, line):
+    @staticmethod
+    def get_indent(line):
         """ Return only the leading whitespace from a line. """
         indent = []
         while line.startswith((' ', '\t')):
