@@ -42,7 +42,7 @@ debugprinter.disable()
 debug = debugprinter.debug
 
 NAME = 'FindFunc'
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -270,8 +270,7 @@ def find_func_in_file(f, pattern):
                     continue
             elif (
                     line and
-                    (not line.startswith((' ', '\t')))
-                    ):
+                    (not line.startswith((' ', '\t')))):
                 # End if func def? There's a new line with no indention.
                 if funcdef.signature.endswith('{'):
                     # Must find a closing brace to be the end.
@@ -322,6 +321,8 @@ def get_func_pattern(pattern, ignore_case=True):
         r'(def {userpattern} ?\()',
         r'(([ \t]+)def {userpattern} ?\()',
         r'({userpattern} ?= ? lambda)',
+        # Python class pattern.
+        r'(class {userpattern} ?\()',
         # Shell patterns.
         r'(function {userpattern} ?\{{)',
         r'({userpattern}\(\) ?\{{)',
