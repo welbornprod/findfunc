@@ -42,7 +42,7 @@ debugprinter.disable()
 debug = debugprinter.debug
 
 NAME = 'FindFunc'
-VERSION = '0.4.0'
+VERSION = '0.4.1'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -54,7 +54,7 @@ USAGESTR = """{versionstr}
     Usage:
         {script} -h | -v
         {script} [-D] [-a] PAT [PATH...] [-S] [-s]
-                 [-c pat] [-C pat] [-e pat] [-f pat] [-l num]
+                 [-c pat] [-C pat] [-e pat] [-f pat] [-l num] [-m num]
 
     Options:
         PATH                   : Zero or more file paths to search.
@@ -81,7 +81,7 @@ USAGESTR = """{versionstr}
                                      =N  : Exactly N lines.
                                     ==N  : Exactly N lines.
                                       N  : Exactly N lines.
-
+        -m num,--maxcount num  : Maximum number of definitions to show.
         -S,--signature         : Just print the signatures found.
         -s,--short             : Use shorter output mode.
         -v,--version           : Show version.
@@ -120,6 +120,8 @@ def main(argd):
     includepat = try_repat(argd['--filter'], default=None)
     excludepat = try_repat(argd['--exclude'], default=None)
     lengthfunc = parse_length_arg(argd['--length'], default=None)
+    maxcount = parse_int(argd['--maxcount'], default=None)
+
     if not argd['PATH']:
         # Use stdin.
         argd['PATH'] = [None]
@@ -163,13 +165,18 @@ def main(argd):
                         sig_only=argd['--signature'],
                     )
                 )
+                if maxcount and total == maxcount:
+                    debug('Stopping at max count: {}'.format(maxcount))
+                    break
     except KeyboardInterrupt:
         if not argd['--short']:
             print_footer(total)
         raise
 
     exitcode = 0 if total > 0 else 1
-    return exitcode if argd['--short'] else print_footer(total)
+    if argd['--short']:
+        return exitcode
+    return print_footer(total, maxcount=maxcount)
 
 
 def find_func(filename, pattern, include_pattern=None, exclude_pattern=None):
@@ -368,6 +375,20 @@ def make_length_op(func, length):
     return test_def_length
 
 
+def parse_int(s, default=None):
+    """ Parse a string as an integer, returns `default` for falsey value.
+        Raises InvalidArg with a message on invalid numbers.
+    """
+    if not s:
+        # None, or less than 1.
+        return default
+    try:
+        val = int(s)
+    except ValueError:
+        raise InvalidArg('invalid number: {}'.format(s))
+    return val
+
+
 def parse_length_arg(s, default=None):
     """ Parse the user's --length operation arg, turning it into a function.
         The functions can then be used like:
@@ -411,15 +432,21 @@ def print_err(*args, **kwargs):
     )
 
 
-def print_footer(total):
+def print_footer(total, maxcount=None):
     """ Print the 'Found X functions' message, return an exit status code. """
-    print(C(str(total), fore='blue', style='bold').join(
+    msg = C(str(total), fore='blue', style='bold').join(
         C('\nFound ', fore='cyan'),
         C(
             ' definition.' if total == 1 else ' definitions.',
             fore='cyan'
         )
-    ))
+    )
+    if total == maxcount:
+        msg = C(' ').join(
+            msg,
+            C('Max count was satisfied.', fore='cyan'),
+        )
+    print(msg)
     return 0 if total > 0 else 1
 
 
