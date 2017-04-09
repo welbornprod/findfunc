@@ -21,6 +21,7 @@ from colr import (
     auto_disable as colr_auto_disable,
     disabled as colr_disabled,
     docopt,
+    enable as colr_enable,
     Colr as C,
 )
 from printdebug import DebugColrPrinter
@@ -42,7 +43,7 @@ debugprinter.disable()
 debug = debugprinter.debug
 
 NAME = 'FindFunc'
-VERSION = '0.4.1'
+VERSION = '0.4.2'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -53,7 +54,7 @@ USAGESTR = """{versionstr}
 
     Usage:
         {script} -h | -v
-        {script} [-D] [-a] PAT [PATH...] [-S] [-s]
+        {script} [-D] [-a] PAT [PATH...] [-S] [-s] [--color]
                  [-c pat] [-C pat] [-e pat] [-f pat] [-l num] [-m num]
 
     Options:
@@ -63,6 +64,7 @@ USAGESTR = """{versionstr}
         PAT                    : Function name or regex pattern to search for.
         -a,--any               : Matches anywhere in the name.
                                  This is the same as: (.+?pattern|pattern.+?)
+        --color                : Always use color.
         -c pat,--contains pat  : Only show definitions that contain this
                                  pattern in the body.
         -C pat,--without pat   : Only show definitions that do not contain
@@ -110,7 +112,8 @@ def main(argd):
     DEBUG = argd['--debug']
     if DEBUG:
         debugprinter.enable()
-
+    if argd['--color']:
+        colr_enable()
     if argd['--any']:
         argd['PAT'] = '(.+?{pat}|{pat}.+?)'.format(pat=argd['PAT'])
     # Using the default 'all' pattern for possible future function listing.
