@@ -1,14 +1,32 @@
 # FindFunc
 
-Like `grep`, except it will find and print functions in source code files. It
-currently handles
+Finds and prints function definitions/signatures in source code files.
+It currently handles
 JavaScript,
 Shell,
 Python (classes too, since they're just functions anyway :smile:),
 and C-style
 function definitions,
-as well as Makefile targets.
+as well as Makefile targets. It will highlight the body of the functions for
+readability.
 
+## Dependencies
+
+These are installable with `pip`:
+
+Name | Description
+---|---
+[colr](https://github.com/welbornprod/colr)|Terminal colors.
+[docopt](https://github.com/docopt/docopt)|Command line argument parsing.
+[printdebug](https://github.com/welbornprod/printdebug)|Debug printing for command line tools.
+[pygments](http://pygments.org)|Source code highlighting.
+
+## Installation:
+
+This package is listed on PyPi, and is installable with `pip`:
+```bash
+pip install findfunc
+```
 
 ## Usage
 ```
@@ -48,3 +66,14 @@ Options:
     -s,--short             : Use shorter output mode.
     -v,--version           : Show version.
 ```
+
+## Demo
+
+Here is a recording showing FindFunc's output when ran multiple times for
+various file types:
+
+[![asciicast](https://asciinema.org/a/79tq1dt69uhy4298avccz5qzw.png)](https://asciinema.org/a/79tq1dt69uhy4298avccz5qzw)
+
+Instead of typing each command, I made a script to do it for me. So it may
+seem a little fast. It's running `findfunc PATTERN DIR_OR_FILE` with or
+without a `--maxcount` or `--signature` flag set.
