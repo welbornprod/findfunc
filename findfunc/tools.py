@@ -1,29 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-""" findfunc.py
-    Finds function definitions in local source files.
-    This is a rewrite of findfunc.sh to better handle pygments integration.
-    It currently handles Python, Javascript, Bash, Make, and C-like languages.
-
-    The search is regex-based, and depends on function defs starting on a new
-    line. No AST-parser or anything like that. It works for me to find
-    "snippets" or commonly-used functions.
-
-    -Christopher Welborn 11-15-2016
-"""
-
 import os
 import re
 import sys
 
-from colr import (
-    auto_disable as colr_auto_disable,
-    disabled as colr_disabled,
-    docopt,
-    enable as colr_enable,
-    Colr as C,
-)
+import colr
 from printdebug import DebugColrPrinter
 
 from pygments.formatters import Terminal256Formatter
@@ -34,152 +13,10 @@ from pygments.lexers import (
     guess_lexer,
 )
 from pygments.util import ClassNotFound
-
-# Disable colors when piping output.
-colr_auto_disable()
-
+C = colr.Colr
 debugprinter = DebugColrPrinter()
 debugprinter.disable()
 debug = debugprinter.debug
-
-NAME = 'FindFunc'
-VERSION = '0.4.2'
-VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
-SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
-SCRIPTDIR = os.path.abspath(sys.path[0])
-
-USAGESTR = """{versionstr}
-
-    Finds function definitions and Makefile targets in files.
-
-    Usage:
-        {script} -h | -v
-        {script} [-D] [-a] PAT [PATH...] [-S] [-s] [--color]
-                 [-c pat] [-C pat] [-e pat] [-f pat] [-l num] [-m num]
-
-    Options:
-        PATH                   : Zero or more file paths to search.
-                                 If the path is a directory it will be walked.
-                                 Default: stdin
-        PAT                    : Function name or regex pattern to search for.
-        -a,--any               : Matches anywhere in the name.
-                                 This is the same as: (.+?pattern|pattern.+?)
-        --color                : Always use color.
-        -c pat,--contains pat  : Only show definitions that contain this
-                                 pattern in the body.
-        -C pat,--without pat   : Only show definitions that do not contain
-                                 this pattern in the body.
-                                 This cancels out any -c pattern.
-        -D,--debug             : Print some debugging info while running.
-        -e pat,--exclude pat   : Regex pattern to exclude file paths.
-        -f pat,--filter pat    : Regex pattern to include file paths.
-        -h,--help              : Show this help message.
-        -l num,--length num    : Show definitions that match this line length.
-                                 Tests can be prepended:
-                                     >N  : More than N lines.
-                                     <N  : Less than N lines.
-                                    >=N  : More than or equal to N lines.
-                                    <=N  : Less than or equal to N lines.
-                                     =N  : Exactly N lines.
-                                    ==N  : Exactly N lines.
-                                      N  : Exactly N lines.
-        -m num,--maxcount num  : Maximum number of definitions to show.
-        -S,--signature         : Just print the signatures found.
-        -s,--short             : Use shorter output mode.
-        -v,--version           : Show version.
-
-    Any file with a name like '[Mm]akefile' will trigger makefile-mode.
-    Unfortunately that mode doesn't work for stdin data.
-
-""".format(script=SCRIPT, versionstr=VERSIONSTR)
-
-DEBUG = False
-
-# Length checks that can be used with -l,--length.
-LEN_OPS = {
-    '=': (lambda length, x: length == x),
-    '>': (lambda length, x: length > x),
-    '<': (lambda length, x: length < x),
-    '>=': (lambda length, x: length >= x),
-    '<=': (lambda length, x: length <= x),
-}
-LEN_OPS['=='] = LEN_OPS['=']
-
-
-def main(argd):
-    """ Main entry point, expects doctopt arg dict as argd. """
-    global DEBUG
-    DEBUG = argd['--debug']
-    if DEBUG:
-        debugprinter.enable()
-    if argd['--color']:
-        colr_enable()
-    if argd['--any']:
-        argd['PAT'] = '(.+?{pat}|{pat}.+?)'.format(pat=argd['PAT'])
-    # Using the default 'all' pattern for possible future function listing.
-    userpat = try_repat(argd['PAT'], default=re.compile('.+'))
-    containspat = try_repat(argd['--contains'], default=None)
-    withoutpat = try_repat(argd['--without'], default=None)
-    includepat = try_repat(argd['--filter'], default=None)
-    excludepat = try_repat(argd['--exclude'], default=None)
-    lengthfunc = parse_length_arg(argd['--length'], default=None)
-    maxcount = parse_int(argd['--maxcount'], default=None)
-
-    if not argd['PATH']:
-        # Use stdin.
-        argd['PATH'] = [None]
-
-    total = 0
-    try:
-        for filepath in argd['PATH']:
-            if filepath and os.path.isdir(filepath):
-                funcfinder = find_func_in_dir
-            else:
-                funcfinder = find_func
-            for funcdef in funcfinder(
-                    filepath,
-                    userpat,
-                    include_pattern=includepat,
-                    exclude_pattern=excludepat):
-                # Test content?
-                if (
-                        (containspat is not None) and
-                        (not funcdef.contains(containspat))):
-                    debug('Skipping non-match: {}'.format(funcdef.signature))
-                    continue
-                if (
-                        (withoutpat is not None) and
-                        funcdef.contains(withoutpat)):
-                    debug('Skipping match: {}'.format(funcdef.signature))
-                    continue
-                # Test length?
-                if (
-                        (lengthfunc is not None) and
-                        (not lengthfunc(len(funcdef)))):
-                    debug('Skipping non-length match: {}'.format(
-                        funcdef.signature
-                    ))
-                    continue
-                # Passed the gauntlet.
-                total += 1
-                print(
-                    funcdef.highlighted(
-                        content_only=argd['--short'],
-                        sig_only=argd['--signature'],
-                    )
-                )
-                if maxcount and total == maxcount:
-                    debug('Stopping at max count: {}'.format(maxcount))
-                    break
-    except KeyboardInterrupt:
-        if not argd['--short']:
-            print_footer(total)
-        raise
-
-    exitcode = 0 if total > 0 else 1
-    if argd['--short']:
-        return exitcode
-    return print_footer(total, maxcount=maxcount)
 
 
 def find_func(filename, pattern, include_pattern=None, exclude_pattern=None):
@@ -201,7 +38,6 @@ def find_func(filename, pattern, include_pattern=None, exclude_pattern=None):
         if skip_file:
             debug('Skipping filtered file: {}'.format(filename))
         else:
-            debug('Opening file: {}'.format(filename))
             try:
                 with open(filename, 'r') as f:
                     yield from find_func_in_file(f, pattern)
@@ -323,6 +159,11 @@ def get_func_pattern(pattern, ignore_case=True):
     userpat = pattern.pattern
     if not (userpat.startswith('(') and userpat.endswith(')')):
         userpat = '({})'.format(userpat)
+    # Try retrieving cached version.
+    cached = get_func_pattern.patterns.get(userpat, None)
+    if cached is not None:
+        return cached
+
     pats = (
         # Javascript patterns
         r'(var {userpattern} ?\=)',
@@ -341,10 +182,17 @@ def get_func_pattern(pattern, ignore_case=True):
     )
     finalpat = '^({})'.format('|'.join(pats)).format(userpattern=userpat)
     debug('Compiling pattern: {}'.format(finalpat))
-    return re.compile(
+    repat = re.compile(
         finalpat,
         flags=re.IGNORECASE if ignore_case else 0,
     )
+    # Cache this pattern for future calls to this function.
+    get_func_pattern.patterns[userpat] = repat
+    return repat
+
+
+# This function remembers the patterns that it compiles.
+get_func_pattern.patterns = {}
 
 
 def get_make_target_begin_pattern():
@@ -363,109 +211,28 @@ def get_make_target_pattern(pattern, ignore_case=True):
     if not (userpat.startswith('(') and userpat.endswith(')')):
         userpat = '({})'.format(userpat)
 
+    # Try retrieving cached version.
+    cached = get_make_target_pattern.patterns.get(userpat, None)
+    if cached is not None:
+        return cached
+
     finalpat = '^{userpattern}:'.format(userpattern=userpat)
     debug('Compiling make target pattern: {}'.format(finalpat))
-    return re.compile(
+    repat = re.compile(
         finalpat,
         flags=re.IGNORECASE if ignore_case else 0,
     )
+    get_make_target_pattern.patterns[userpat] = repat
+    return repat
 
 
-def make_length_op(func, length):
-    """ Make a function that tests length equality, for --length. """
-    def test_def_length(deflength):
-        return func(deflength, length)
-    return test_def_length
+# This function remembers the patterns that it compiles.
+get_make_target_pattern.patterns = {}
 
-
-def parse_int(s, default=None):
-    """ Parse a string as an integer, returns `default` for falsey value.
-        Raises InvalidArg with a message on invalid numbers.
-    """
-    if not s:
-        # None, or less than 1.
-        return default
-    try:
-        val = int(s)
-    except ValueError:
-        raise InvalidArg('invalid number: {}'.format(s))
-    return val
-
-
-def parse_length_arg(s, default=None):
-    """ Parse the user's --length operation arg, turning it into a function.
-        The functions can then be used like:
-            lengthfunc = parse_length_arg('>5')
-            if lengthfunc(len(functiondef)):
-                print('FunctionDef has more than 5 lines.')
-        Returns the function on success.
-        Raises InvalidArg on bad integers/test-syntax.
-    """
-    if not s:
-        return default
-
-    for opstr in LEN_OPS:
-        if s.startswith(opstr):
-            func = LEN_OPS[opstr]
-            s = s[len(opstr):]
-            break
-    else:
-        # No function provided, use =.
-        func = LEN_OPS['=']
-
-    try:
-        intval = int(s)
-    except ValueError:
-        raise InvalidArg(
-            '\n'.join((
-                'Invalid --length operation: {}',
-                'Expecting an integer or >N,<N,>=N,<=N,=N,==N.'
-            )).format(s)
-        )
-    return make_length_op(func, intval)
-
-
-def print_err(*args, **kwargs):
-    """ A wrapper for print() that uses stderr by default. """
-    if kwargs.get('file', None) is None:
-        kwargs['file'] = sys.stderr
-    print(
-        C(kwargs.get('sep', ' ').join(str(a) for a in args), fore='red'),
-        **kwargs
-    )
-
-
-def print_footer(total, maxcount=None):
-    """ Print the 'Found X functions' message, return an exit status code. """
-    msg = C(str(total), fore='blue', style='bold').join(
-        C('\nFound ', fore='cyan'),
-        C(
-            ' definition.' if total == 1 else ' definitions.',
-            fore='cyan'
-        )
-    )
-    if total == maxcount:
-        msg = C(' ').join(
-            msg,
-            C('Max count was satisfied.', fore='cyan'),
-        )
-    print(msg)
-    return 0 if total > 0 else 1
-
-
-def try_repat(s, default=None):
-    """ Try compiling a regex pattern.
-        If `s` is Falsey, `default` is returned.
-        On errors, InvalidArg is raised.
-        On success, a compiled regex pattern is returned.
-    """
-    if not s:
-        return default
-    try:
-        p = re.compile(s)
-    except re.error as ex:
-        raise InvalidArg('Invalid pattern: {}\n{}'.format(s, ex))
-    return p
+# Pre-build the pattern for finding the beginning of any function def.
+# This beginning is also usually the end of the def we were looking at.
+STARTPAT = get_func_begin_pattern()
+STARTMAKETARGETPAT = get_make_target_begin_pattern()
 
 
 class FunctionDef(object):
@@ -598,7 +365,7 @@ class FunctionDef(object):
         """ Return self.lines, highlighted with pygments.
             The lexer is based on self.filename.
         """
-        if colr_disabled():
+        if colr.disabled():
             # No colors.
             return self.to_str(content_only=content_only, sig_only=sig_only)
 
@@ -677,23 +444,3 @@ class InvalidArg(ValueError):
         if self.msg:
             return str(self.msg)
         return 'Invalid argument!'
-
-
-# Pre-build the pattern for finding the beginning of any function def.
-# This beginning is also usually the end of the def we were looking at.
-STARTPAT = get_func_begin_pattern()
-STARTMAKETARGETPAT = get_make_target_begin_pattern()
-
-if __name__ == '__main__':
-    try:
-        mainret = main(docopt(USAGESTR, version=VERSIONSTR, script=SCRIPT))
-    except (InvalidArg, EnvironmentError) as ex:
-        print_err(ex)
-        mainret = 1
-    except (EOFError, KeyboardInterrupt):
-        print_err('\nUser cancelled.\n')
-        mainret = 2
-    except BrokenPipeError:
-        print_err('\nBroken pipe, input/output was interrupted.\n')
-        mainret = 3
-    sys.exit(mainret)
