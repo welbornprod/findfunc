@@ -86,8 +86,7 @@ USAGESTR = """{versionstr}
 
 # This can be set with -D,--debug from the command line.
 DEBUG = False
-# This can only be set during development.
-DEBUG_ARGS = False
+
 # Length checks that can be used with -l,--length.
 LEN_OPS = {
     '=': (lambda length, x: length == x),
@@ -117,17 +116,7 @@ def main(argd):
     excludepat = try_repat(argd['--exclude'], default=None)
     lengthfunc = parse_length_arg(argd['--length'], default=None)
     maxcount = parse_int(argd['--maxcount'], default=None)
-    if DEBUG_ARGS:
-        debug_args(
-            argd,
-            userpat={'flag': 'PAT', 'parsed': userpat},
-            containspat={'flag': '--contains', 'parsed': containspat},
-            withoutpat={'flag': '--without', 'parsed': withoutpat},
-            includepat={'flag': '--filter', 'parsed': includepat},
-            excludepat={'flag': '--exclude', 'parsed': excludepat},
-            lengthfunc={'flag': '--length', 'parsed': lengthfunc},
-            maxcount={'flag': '--maxcount', 'parsed': maxcount},
-        )
+
     if not argd['PATH']:
         # Use stdin.
         argd['PATH'] = [None]
@@ -177,7 +166,7 @@ def debug_args(argd, **kwargs):
             '{:<12} ({:<12}) = {!r}'.format(
                 name,
                 info['flag'],
-                info['parsed'],
+                info.get('parsed', argd[info['flag']]),
             ),
             align=True,
         )

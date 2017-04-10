@@ -82,7 +82,9 @@ def find_func_in_file(f, pattern):
             f            : File object to read.
             pattern      : Precompiled regex pattern for function def.
     """
-    if f.name.lower() == 'makefile':
+    filename = os.path.split(f.name)[-1]
+    if filename.lower() == 'makefile':
+        debug('Using makefile mode.')
         startpat = STARTMAKETARGETPAT
         pattern = get_make_target_pattern(pattern, ignore_case=True)
     else:
@@ -188,7 +190,7 @@ def get_func_pattern(pattern, ignore_case=True):
         r'(function {userpattern} ?\{{)',
         r'({userpattern}\(\) ?\{{)',
         # Basic C patterns.
-        r'(\w{{3,16}} {userpattern} ?\(([^\)]+)?\) ? \{{)',
+        r'((\w{{3,16}} )?{userpattern} ?\(([^\)]+)?\) ? \{{)',
     )
     finalpat = '^({})'.format('|'.join(pats)).format(userpattern=userpat)
     debug('Compiling pattern: {}'.format(finalpat))
@@ -393,18 +395,20 @@ class FunctionDef(object):
             )
         )
 
-        if sig_only:
-            sig_line = C(self.signature, fore='yellow')
-            if content_only:
-                return str(sig_line)
-            return '{}\n    {}'.format(sig_fmted, sig_line)
-
         style = (style or 'monokai').lower().strip() or 'monokai'
         lexer = self.get_lexer()
         try:
             fmter = Terminal256Formatter(style=style.lower())
         except ClassNotFound:
             raise InvalidArg('Invalid style name: {}'.format(style))
+        if sig_only:
+            # Fix braced signatures for C-style files.
+            signature = self.signature.rstrip('{').rstrip()
+            sig_line = highlight(signature, lexer, fmter).rstrip()
+            if content_only:
+                return str(sig_line)
+            return '{}\n    {}'.format(sig_fmted, sig_line)
+
         debug('Highlighting lines: {}, Total: {}'.format(
             self.get_filename(),
             len(self),
