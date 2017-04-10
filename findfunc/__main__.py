@@ -19,6 +19,7 @@ import sys
 
 from colr import docopt
 from .tools import (
+    __version__,
     colr,
     C,
     debug,
@@ -34,8 +35,7 @@ colr.auto_disable()
 
 
 NAME = 'FindFunc'
-VERSION = '0.4.2'
-VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
+VERSIONSTR = '{} v. {}'.format(NAME, __version__)
 SCRIPT = 'findfunc'
 SCRIPTDIR = os.path.abspath(sys.path[0])
 

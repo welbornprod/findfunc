@@ -3,6 +3,7 @@
     -Christopher Welborn 4-9-17
 """
 from .tools import (
+    __version__,
     FunctionDef,
     find_func,
     find_func_in_dir,
@@ -10,6 +11,7 @@ from .tools import (
 )
 
 __all__ = (
+    '__version__',
     'FunctionDef',
     'find_func',
     'find_func_in_dir',

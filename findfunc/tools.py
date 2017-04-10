@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+from io import TextIOBase
 
 import colr
 from printdebug import DebugColrPrinter
@@ -13,6 +14,9 @@ from pygments.lexers import (
     guess_lexer,
 )
 from pygments.util import ClassNotFound
+
+__version__ = '0.4.3'
+
 C = colr.Colr
 debugprinter = DebugColrPrinter()
 debugprinter.disable()
@@ -27,22 +31,28 @@ def find_func(filename, pattern, include_pattern=None, exclude_pattern=None):
             include_pattern  : Precompiled regex, only include matching names.
             exclude_pattern  : Precompiled regex, exclude matching names.
     """
-    if filename:
+    if filename is not None:
+        # File path for an already opened file?
+        filepath = getattr(filename, 'name', filename)
         skip_file = (
             (include_pattern is not None) and
-            (include_pattern.search(filename) is None)
+            (include_pattern.search(filepath) is None)
         ) or (
             (exclude_pattern is not None) and
-            (exclude_pattern.search(filename) is not None)
+            (exclude_pattern.search(filepath) is not None)
         )
         if skip_file:
-            debug('Skipping filtered file: {}'.format(filename))
+            debug('Skipping filtered file: {}'.format(filepath))
         else:
             try:
-                with open(filename, 'r') as f:
-                    yield from find_func_in_file(f, pattern)
+                if isinstance(filename, TextIOBase):
+                    # An already open file.
+                    yield from find_func_in_file(filename, pattern)
+                else:
+                    with open(filepath, 'r') as f:
+                        yield from find_func_in_file(f, pattern)
             except UnicodeDecodeError as ex:
-                debug('Skipping file: {}'.format(filename))
+                debug('Skipping file: {}'.format(filepath))
                 debug('Message: {}'.format(ex), align=True)
     else:
         debug('Reading from: stdin')
