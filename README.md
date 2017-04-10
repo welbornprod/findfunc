@@ -72,7 +72,7 @@ Options:
 Here is a recording showing FindFunc's output when ran multiple times for
 various file types:
 
-[![asciicast](https://asciinema.org/a/79tq1dt69uhy4298avccz5qzw.png)](https://asciinema.org/a/79tq1dt69uhy4298avccz5qzw)
+[![asciicast](https://asciinema.org/a/ctu4rqhcv4tyq559dxzvxgzcz.png)](https://asciinema.org/a/ctu4rqhcv4tyq559dxzvxgzcz)
 
 Instead of typing each command, I made a script to do it for me. So it may
 seem a little fast. It's running `findfunc PATTERN DIR_OR_FILE` with or

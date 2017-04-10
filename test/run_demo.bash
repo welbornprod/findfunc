@@ -22,7 +22,7 @@ declare -A commands=(
 for cmddesc in "${!commands[@]}"; do
     printf "\nFinding a %s.\n" "$cmddesc"
     cmd="${commands[$cmddesc]}"
-    printf "%s\n" "$cmd"
-    $cmd || exit 1
+    printf "%b%s%b\n" "${green:-}" "$cmd" "${NC:-}"
+    $cmd --color 2>/dev/null || exit 1
     sleep 1
 done
