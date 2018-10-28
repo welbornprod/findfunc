@@ -1,1 +1,2 @@
+v0.4.4 10/28/18 -- Added config file, with `default_paths` option.
 v0.4.3 04/09/17 -- Initial pypi package.

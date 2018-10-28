@@ -29,6 +29,8 @@ from .tools import (
     InvalidArg,
 )
 
+from .json_settings import load_json_settings
+
 
 # Disable colors when piping output.
 colr.auto_disable()
@@ -38,6 +40,27 @@ NAME = 'FindFunc'
 VERSIONSTR = '{} v. {}'.format(NAME, __version__)
 SCRIPT = 'findfunc'
 SCRIPTDIR = os.path.abspath(sys.path[0])
+CONFIGDIRS = (
+    '',
+    os.path.expanduser('~'),
+    os.path.expanduser('~/.local/share{}'.format(SCRIPT)),
+)
+CONFIGFILENAME = 'findfunc.json'
+CONFIGFILEPATH = os.path.expanduser('~/{}'.format(CONFIGFILENAME))
+
+for configdir in CONFIGDIRS:
+    tryconfigpath = os.path.join(configdir, CONFIGFILENAME)
+    if os.path.exists(tryconfigpath):
+        CONFIGFILEPATH = tryconfigpath
+        break
+# Load settings from disk, or create a new settings instance.
+CONFIG = load_json_settings(
+    CONFIGFILEPATH,
+    default={'default_paths': []},
+)
+if isinstance(CONFIG['default_paths'], str):
+    # Ensure default_paths is a list of dirs, not just a string.
+    CONFIG['default_paths'] = [CONFIG['default_paths']]
 
 USAGESTR = """{versionstr}
 
@@ -45,6 +68,8 @@ USAGESTR = """{versionstr}
 
     Usage:
         {script} -h | -v
+        {script} PAT -p [-a] [--color] [-D] [-S] [-s]
+                 [-c pat] [-C pat] [-e pat] [-f pat] [-l num] [-m num]
         {script} PAT [PATH...] [-a] [--color] [-D] [-S] [-s]
                  [-c pat] [-C pat] [-e pat] [-f pat] [-l num] [-m num]
 
@@ -75,6 +100,8 @@ USAGESTR = """{versionstr}
                                     ==N  : Exactly N lines.
                                       N  : Exactly N lines.
         -m num,--maxcount num  : Maximum number of definitions to show.
+        -p,--paths             : Search all directories found in the config
+                                 file.
         -S,--signature         : Just print the signatures found.
         -s,--short             : Use shorter output mode.
         -v,--version           : Show version.
@@ -82,7 +109,13 @@ USAGESTR = """{versionstr}
     Any file with a name like '[Mm]akefile' will trigger makefile-mode.
     Unfortunately that mode doesn't work for stdin data.
 
-""".format(script=SCRIPT, versionstr=VERSIONSTR)
+    JSON config {configstatus} loaded from: {configfile}
+""".format(
+    script=SCRIPT,
+    versionstr=VERSIONSTR,
+    configstatus='was' if (CONFIG and CONFIG['default_paths']) else 'can be',
+    configfile=CONFIGFILEPATH,
+)
 
 # This can be set with -D,--debug from the command line.
 DEBUG = False
@@ -117,7 +150,15 @@ def main(argd):
     lengthfunc = parse_length_arg(argd['--length'], default=None)
     maxcount = parse_int(argd['--maxcount'], default=None)
 
-    if not argd['PATH']:
+    if argd['--paths']:
+        # Using config dirs.
+        argd['PATH'].extend(
+            os.path.expanduser(s) for s in CONFIG['default_paths']
+        )
+        if not argd['PATH']:
+            raise InvalidArg('Nothing to search, config is empty.')
+        debug('Searching {} dir/s found in config.'.format(len(argd['PATH'])))
+    elif not argd['PATH']:
         # Use stdin.
         argd['PATH'] = [None]
 

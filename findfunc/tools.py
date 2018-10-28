@@ -15,7 +15,7 @@ from pygments.lexers import (
 )
 from pygments.util import ClassNotFound
 
-__version__ = '0.4.3'
+__version__ = '0.4.4'
 
 C = colr.Colr
 debugprinter = DebugColrPrinter()
